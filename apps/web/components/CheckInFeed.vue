@@ -46,7 +46,8 @@
 </template>
 
 <script setup lang="ts">
-import { MOOD_EMOJIS, Mood } from '@team-pulse/shared';
+import type { Mood } from '@team-pulse/shared';
+import * as Shared from '@team-pulse/shared';
 
 interface Props {
   checkIns: any[];
@@ -55,6 +56,6 @@ interface Props {
 defineProps<Props>();
 
 const getMoodEmoji = (mood: Mood) => {
-  return MOOD_EMOJIS[mood] || '😐';
+  return Shared.MOOD_EMOJIS[mood] || '😐';
 };
 </script>

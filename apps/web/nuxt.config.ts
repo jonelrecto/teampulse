@@ -1,7 +1,13 @@
+import { resolve } from 'pathe'
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/supabase', '@pinia/nuxt'],
+  alias: {
+    // Use TS source directly to avoid CJS named-export issues during Vite/Rollup builds
+    '@team-pulse/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
+  },
   supabase: {
     url: process.env.SUPABASE_URL,
     key: process.env.SUPABASE_ANON_KEY,
