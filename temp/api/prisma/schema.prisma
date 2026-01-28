@@ -1,0 +1,135 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                String    @id @default(cuid())
+  supabaseId        String    @unique
+  email             String    @unique
+  displayName       String
+  avatarUrl         String?
+  timezone          String    @default("America/New_York")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  memberships       TeamMembership[]
+  checkIns          CheckIn[]
+  notifications     Notification[]
+  notificationPrefs NotificationPreference[]
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  logoUrl     String?
+  inviteCode  String   @unique @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships TeamMembership[]
+  checkIns    CheckIn[]
+}
+
+model TeamMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  role      TeamRole @default(MEMBER)
+  joinedAt  DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@index([userId])
+  @@index([teamId])
+}
+
+enum TeamRole {
+  ADMIN
+  MEMBER
+}
+
+model CheckIn {
+  id          String   @id @default(cuid())
+  userId      String
+  teamId      String
+  yesterday   String
+  today       String
+  blockers    String?
+  mood        Mood
+  energy      Int
+  checkInDate DateTime @db.Date
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  attachments CheckInAttachment[]
+
+  @@unique([userId, teamId, checkInDate])
+  @@index([teamId, checkInDate])
+  @@index([userId])
+}
+
+enum Mood {
+  GREAT
+  GOOD
+  OKAY
+  LOW
+  STRUGGLING
+}
+
+model CheckInAttachment {
+  id          String   @id @default(cuid())
+  checkInId   String
+  url         String
+  filename    String
+  storagePath String
+  createdAt   DateTime @default(now())
+
+  checkIn     CheckIn  @relation(fields: [checkInId], references: [id], onDelete: Cascade)
+
+  @@index([checkInId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, readAt])
+  @@index([userId])
+}
+
+model NotificationPreference {
+  id              String          @id @default(cuid())
+  userId          String
+  teamId          String
+  reminderEnabled Boolean         @default(true)
+  reminderTime    String          @default("09:00")
+  digestFrequency DigestFrequency @default(DAILY)
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@index([userId])
+}
+
+enum DigestFrequency {
+  OFF
+  DAILY
+  WEEKLY
+}
