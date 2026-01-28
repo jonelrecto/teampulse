@@ -17,6 +17,10 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "typecheck": "turbo run typecheck"
   },
+  "workspace": [
+    "apps/*",
+    "packages/*"
+  ],
   "devDependencies": {
     "prettier": "^3.2.5",
     "turbo": "^2.0.0",
