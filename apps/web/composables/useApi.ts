@@ -12,13 +12,11 @@ export const useApi = () => {
       data: { session },
     } = await supabase.auth.getSession();
 
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
+    const headers = new Headers(options.headers || {});
+    headers.set('Content-Type', 'application/json');
 
     if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
+      headers.set('Authorization', `Bearer ${session.access_token}`);
     }
 
     const response = await fetch(`${config.public.apiUrl}${endpoint}`, {

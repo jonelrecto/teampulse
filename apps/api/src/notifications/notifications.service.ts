@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UpdateNotificationPreferenceDto, DigestFrequency } from './dto/update-notification-preference.dto';
+import { UpdateNotificationPreferenceDto } from './dto/update-notification-preference.dto';
+import { DigestFrequency } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class NotificationsService {
@@ -24,7 +26,7 @@ export class NotificationsService {
     return this.prisma.notification.update({
       where: {
         id: notificationId,
-        userId, // Ensure user owns the notification
+        userId,
       },
       data: {
         readAt: new Date(),
@@ -50,7 +52,7 @@ export class NotificationsService {
     return this.prisma.notificationPreference.findMany({
       where: { userId },
       include: {
-        team: {
+        Team: {
           select: {
             id: true,
             name: true,
@@ -73,7 +75,8 @@ export class NotificationsService {
         },
       },
       create: {
-        userId,
+        id: randomUUID(), // Add the missing id field
+        userId: userId,
         teamId,
         reminderEnabled: data.reminderEnabled ?? true,
         reminderTime: data.reminderTime ?? '09:00',
@@ -86,6 +89,7 @@ export class NotificationsService {
   async create(userId: string, type: string, title: string, body: string) {
     return this.prisma.notification.create({
       data: {
+        id: randomUUID(), // Add the missing id field
         userId,
         type,
         title,

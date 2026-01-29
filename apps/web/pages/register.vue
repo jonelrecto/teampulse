@@ -75,10 +75,12 @@
 <script setup lang="ts">
 definePageMeta({
   layout: false,
+  middleware: 'guest',
 });
 
 const { register } = useAuth();
 const router = useRouter();
+const config = useRuntimeConfig();
 
 const displayName = ref('');
 const email = ref('');
@@ -93,7 +95,7 @@ const handleRegister = async () => {
   try {
     await register(email.value, password.value, displayName.value);
     router.push('/dashboard');
-  } catch (err: any) {
+  } catch (err) {
     error.value = err.message || 'Failed to create account';
   } finally {
     loading.value = false;

@@ -1,11 +1,6 @@
 import { IsBoolean, IsOptional, IsString, IsEnum } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-
-export enum DigestFrequency {
-  DAILY = 'DAILY',
-  WEEKLY = 'WEEKLY',
-  NEVER = 'NEVER',
-}
+import { DigestFrequency } from '@prisma/client'; // Import from Prisma
 
 export class UpdateNotificationPreferenceDto {
   @ApiPropertyOptional()

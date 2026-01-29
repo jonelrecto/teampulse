@@ -1,13 +1,6 @@
-import { IsString, IsOptional, IsEnum, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsUUID, IsInt, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-
-export enum Mood {
-  GREAT = 'GREAT',
-  GOOD = 'GOOD',
-  OKAY = 'OKAY',
-  BAD = 'BAD',
-  TERRIBLE = 'TERRIBLE',
-}
+import { Mood } from '@prisma/client'; // Import from Prisma
 
 export class CreateCheckInDto {
   @ApiProperty()
@@ -18,17 +11,22 @@ export class CreateCheckInDto {
   @IsString()
   today: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
   @IsString()
-  yesterday?: string;
+  yesterday: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   blockers?: string;
 
-  @ApiProperty({ enum: Mood })
+  @ApiProperty({ enum: Mood, enumName: 'Mood' })
   @IsEnum(Mood)
   mood: Mood;
+
+  @ApiProperty({ minimum: 1, maximum: 10 })
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  energy: number;
 }

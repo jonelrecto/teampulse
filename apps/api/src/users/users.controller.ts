@@ -1,40 +1,153 @@
 import {
   Controller,
   Get,
-  Put,
-  Param,
+  Post,
+  Patch,
   Body,
   UseGuards,
-  ParseUUIDPipe,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  Param,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { User } from '../common/decorators/user.decorator';
+import { CurrentUser } from '../common/decorators/user.decorator';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { createClient } from '@supabase/supabase-js';
 
 @ApiTags('users')
 @Controller('users')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  private supabase;
 
-  @Get()
-  @ApiOperation({ summary: 'Get all users' })
-  findAll() {
-    return this.usersService.findAll();
+  constructor(private usersService: UsersService) {
+    this.supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+    );
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get user by ID' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.findOne(id);
+  @Post()
+  @ApiOperation({ summary: 'Create user record in database' })
+  @ApiResponse({ status: 201, description: 'User created successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  async createUser(@Body() createUserDto: CreateUserDto) {
+    return this.usersService.create(createUserDto);
   }
 
-  @Put('me')
-  @ApiOperation({ summary: 'Update current user' })
-  update(@User() user: any, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(user.id, updateUserDto);
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'User profile retrieved' })
+  async getMe(@CurrentUser() user: any) {
+    console.log('me here');
+
+    const userData = await this.usersService.findBySupabaseId(user.id);
+    console.log('userData', userData);
+    return { ...user, ...userData };
+  }
+
+  @Post('me/avatar')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('avatar'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload current user avatar' })
+  @ApiResponse({ status: 200, description: 'Avatar uploaded' })
+  async uploadMyAvatar(
+    @CurrentUser() user: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    // Validate file type
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Invalid file type. Only images are allowed.');
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('File size must be less than 5MB');
+    }
+
+    const fileName = `${user.id}-${Date.now()}.${file.originalname.split('.').pop()}`;
+    
+    // Upload to Supabase Storage
+    const { data, error } = await this.supabase.storage
+      .from('avatars')
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error('Supabase upload error:', error);
+      throw new BadRequestException('Failed to upload avatar');
+    }
+
+    const {
+      data: { publicUrl },
+    } = this.supabase.storage.from('avatars').getPublicUrl(fileName);
+
+    // Update user avatar in database
+    return this.usersService.updateAvatar(user.id, publicUrl);
+  }
+
+  @Patch(':id/avatar')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('avatar'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload/update user avatar by ID' })
+  @ApiResponse({ status: 200, description: 'Avatar uploaded successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  async uploadAvatar(
+    @Param('id') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    // Validate file type
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Invalid file type. Only images are allowed.');
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('File size must be less than 5MB');
+    }
+
+    const fileName = `${userId}-${Date.now()}.${file.originalname.split('.').pop()}`;
+
+    // Upload to Supabase Storage
+    const { data, error } = await this.supabase.storage
+      .from('avatars')
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error('Supabase upload error:', error);
+      throw new BadRequestException('Failed to upload avatar');
+    }
+
+    const {
+      data: { publicUrl },
+    } = this.supabase.storage.from('avatars').getPublicUrl(fileName);
+
+    // Update user avatar in database
+    return this.usersService.updateAvatar(userId, publicUrl);
   }
 }

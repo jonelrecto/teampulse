@@ -21,10 +21,10 @@ export class AnalyticsService {
     const team = await this.prisma.team.findUnique({
       where: { id: teamId },
       include: {
-        memberships: true,
-        checkIns: {
+        TeamMembership: true,
+        CheckIn: {
           include: {
-            user: {
+            Users: {
               select: {
                 id: true,
                 displayName: true,
@@ -39,11 +39,11 @@ export class AnalyticsService {
       throw new ForbiddenException('Team not found');
     }
 
-    const totalMembers = team.memberships.length;
+    const totalMembers = team.TeamMembership.length;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const todayCheckIns = team.checkIns.filter(
+    const todayCheckIns = team.CheckIn.filter(
       (ci) => new Date(ci.createdAt) >= today,
     );
 
@@ -67,7 +67,7 @@ export class AnalyticsService {
     // Weekly participation
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
-    const weeklyCheckIns = team.checkIns.filter(
+    const weeklyCheckIns = team.CheckIn.filter(
       (ci) => new Date(ci.createdAt) >= weekAgo,
     );
 
@@ -112,7 +112,7 @@ export class AnalyticsService {
         },
       },
       include: {
-        user: {
+        Users: {
           select: {
             id: true,
             email: true,

@@ -48,6 +48,12 @@
         </div>
 
         <div class="text-center">
+          <NuxtLink to="/register" class="text-sm text-indigo-600 hover:text-indigo-500">
+            Sign up
+          </NuxtLink>
+        </div>
+
+        <div class="text-center">
           <NuxtLink to="/forgot-password" class="text-sm text-indigo-600 hover:text-indigo-500">
             Forgot your password?
           </NuxtLink>
@@ -60,6 +66,7 @@
 <script setup lang="ts">
 definePageMeta({
   layout: false,
+  middleware: 'guest',
 });
 
 const { login } = useAuth();
@@ -77,8 +84,10 @@ const handleLogin = async () => {
   try {
     await login(email.value, password.value);
     router.push('/dashboard');
-  } catch (err: any) {
-    error.value = err.message || 'Failed to sign in';
+  } catch (err) {
+    // eslint/TS parser in this repo treats .vue catch vars as JS, so avoid TS syntax here
+    // @ts-ignore
+    error.value = err?.message || 'Failed to sign in';
   } finally {
     loading.value = false;
   }

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCheckInDto } from './dto/create-check-in.dto';
 import { UpdateCheckInDto } from './dto/update-check-in.dto';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class CheckInsService {
@@ -28,9 +29,7 @@ export class CheckInsService {
       where: {
         teamId: createCheckInDto.teamId,
         userId,
-        createdAt: {
-          gte: today,
-        },
+        checkInDate: today,
       },
     });
 
@@ -40,22 +39,26 @@ export class CheckInsService {
 
     return this.prisma.checkIn.create({
       data: {
+        id: randomUUID(),
         teamId: createCheckInDto.teamId,
-        userId,
+        userId: userId,
         today: createCheckInDto.today,
         yesterday: createCheckInDto.yesterday,
         blockers: createCheckInDto.blockers,
         mood: createCheckInDto.mood,
+        energy: createCheckInDto.energy,
+        checkInDate: today,
+        updatedAt: new Date(),
       },
       include: {
-        user: {
+        Users: {
           select: {
             id: true,
             email: true,
             displayName: true,
           },
         },
-        team: {
+        Team: {
           select: {
             id: true,
             name: true,
@@ -81,16 +84,17 @@ export class CheckInsService {
     return this.prisma.checkIn.findMany({
       where: { teamId },
       include: {
-        user: {
+        Users: {
           select: {
             id: true,
             email: true,
             displayName: true,
+            avatarUrl: true,
           },
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        checkInDate: 'desc',
       },
     });
   }
@@ -99,14 +103,14 @@ export class CheckInsService {
     const checkIn = await this.prisma.checkIn.findUnique({
       where: { id },
       include: {
-        user: {
+        Users: {
           select: {
             id: true,
             email: true,
             displayName: true,
           },
         },
-        team: {
+        Team: {
           select: {
             id: true,
             name: true,
@@ -150,16 +154,19 @@ export class CheckInsService {
 
     return this.prisma.checkIn.update({
       where: { id },
-      data: updateCheckInDto,
+      data: {
+        ...updateCheckInDto,
+        updatedAt: new Date(),
+      },
       include: {
-        user: {
+        Users: {
           select: {
             id: true,
             email: true,
             displayName: true,
           },
         },
-        team: {
+        Team: {
           select: {
             id: true,
             name: true,

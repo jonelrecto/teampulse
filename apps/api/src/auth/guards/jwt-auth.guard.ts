@@ -13,7 +13,7 @@ export class JwtAuthGuard implements CanActivate {
   constructor() {
     this.supabase = createClient(
       process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      process.env.SUPABASE_ANON_KEY, // Changed from SERVICE_ROLE_KEY
     );
   }
 
@@ -28,6 +28,7 @@ export class JwtAuthGuard implements CanActivate {
     const token = authHeader.substring(7);
 
     try {
+      // Use getUser with the token - this will verify the JWT
       const {
         data: { user },
         error,
@@ -46,6 +47,7 @@ export class JwtAuthGuard implements CanActivate {
 
       return true;
     } catch (error) {
+      console.error('Authentication error:', error);
       throw new UnauthorizedException('Authentication failed');
     }
   }

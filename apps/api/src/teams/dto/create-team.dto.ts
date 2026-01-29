@@ -9,5 +9,5 @@ export class CreateTeamDto {
 
   @ApiProperty({ required: false })
   @IsString()
-  description?: string;
+  logoUrl?: string;
 }

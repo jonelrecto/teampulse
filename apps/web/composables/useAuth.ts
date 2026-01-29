@@ -3,9 +3,23 @@ import { useAuthStore } from '~/stores/auth';
 
 export const useAuth = () => {
   const supabase = useSupabaseClient();
-  const user = useSupabaseUser();
+  const supabaseUser = useSupabaseUser();
   const authStore = useAuthStore();
   const router = useRouter();
+
+  // Cookie to store user profile
+  const userCookie = useCookie('user_profile', {
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
+
+  // Cookie to store auth token
+  const tokenCookie = useCookie('auth_token', {
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -15,7 +29,18 @@ export const useAuth = () => {
 
     if (error) throw error;
 
+    // Store the access token
+    if (data.session?.access_token) {
+      tokenCookie.value = data.session.access_token;
+    }
+
     await authStore.fetchProfile();
+
+    // Store user in cookie
+    if (authStore.user) {
+      userCookie.value = JSON.stringify(authStore.user);
+    }
+    
     return data;
   };
 
@@ -31,12 +56,40 @@ export const useAuth = () => {
     });
 
     if (error) throw error;
+
+    const supabaseUserId = data?.user?.id;
+
+    if (!supabaseUserId) {
+      throw new Error('Failed to get user ID from registration');
+    }
+
+    // Store the access token
+    if (data.session?.access_token) {
+      tokenCookie.value = data.session.access_token;
+    }
+
+    const userProfile = await authStore.createUser({
+      supabaseId: supabaseUserId,
+      email,
+      displayName,
+    });
+
+    // Store user in cookie
+    if (userProfile) {
+      userCookie.value = JSON.stringify(userProfile);
+    }
+
     return data;
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
     authStore.clear();
+    
+    // Clear cookies
+    userCookie.value = null;
+    tokenCookie.value = null;
+    
     router.push('/login');
   };
 
@@ -56,13 +109,26 @@ export const useAuth = () => {
     if (error) throw error;
   };
 
+  // Load user from cookie if exists
+  const loadUserFromCookie = () => {
+    if (userCookie.value && !authStore.user) {
+      try {
+        authStore.user = JSON.parse(userCookie.value as string);
+      } catch (e) {
+        console.error('Failed to parse user cookie:', e);
+        userCookie.value = null;
+      }
+    }
+  };
+
   return {
-    user,
+    user: computed(() => authStore.user),
     login,
     register,
     logout,
     resetPassword,
     updatePassword,
-    isAuthenticated: computed(() => !!user.value),
+    isAuthenticated: computed(() => !!authStore.user && !!supabaseUser.value),
+    loadUserFromCookie,
   };
 };
