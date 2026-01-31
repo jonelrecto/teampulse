@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Mood } from '@prisma/client'; // Import from Prisma
 
@@ -22,4 +22,10 @@ export class UpdateCheckInDto {
   @IsOptional()
   @IsEnum(Mood)
   mood?: Mood;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 5 })
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  energy: number;
 }

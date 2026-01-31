@@ -5,6 +5,9 @@
         <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Sign in to your account
         </h2>
+        <p v-if="inviteTeam" class="mt-2 text-center text-sm text-gray-600">
+          You've been invited to join <strong class="text-indigo-600">{{ inviteTeam.name }}</strong>
+        </p>
       </div>
       <form class="mt-8 space-y-6" @submit.prevent="handleLogin">
         <div class="rounded-md shadow-sm -space-y-px">
@@ -48,8 +51,11 @@
         </div>
 
         <div class="text-center">
-          <NuxtLink to="/register" class="text-sm text-indigo-600 hover:text-indigo-500">
-            Sign up
+          <NuxtLink 
+            :to="inviteCode ? `/register?invite=${inviteCode}` : '/register'" 
+            class="text-sm text-indigo-600 hover:text-indigo-500"
+          >
+            Don't have an account? Sign up
           </NuxtLink>
         </div>
 
@@ -70,12 +76,31 @@ definePageMeta({
 });
 
 const { login } = useAuth();
+const { joinTeam } = useTeam();
 const router = useRouter();
+const route = useRoute();
+const api = useApi();
 
 const email = ref('');
 const password = ref('');
 const loading = ref(false);
 const error = ref('');
+const inviteCode = ref<string | null>(null);
+const inviteTeam = ref<any>(null);
+
+// Check for invite code in URL
+onMounted(async () => {
+  const code = route.query.invite as string;
+  if (code) {
+    inviteCode.value = code;
+    try {
+      // Fetch team info to display
+      inviteTeam.value = await api.get(`/teams/join/${code}`);
+    } catch (err) {
+      console.error('Failed to fetch team info:', err);
+    }
+  }
+});
 
 const handleLogin = async () => {
   loading.value = true;
@@ -83,10 +108,22 @@ const handleLogin = async () => {
 
   try {
     await login(email.value, password.value);
-    router.push('/dashboard');
-  } catch (err) {
-    // eslint/TS parser in this repo treats .vue catch vars as JS, so avoid TS syntax here
-    // @ts-ignore
+    
+    // If there's an invite code, join the team
+    if (inviteCode.value) {
+      try {
+        await joinTeam(inviteCode.value);
+        const team = await api.get(`/teams/join/${inviteCode.value}`);
+        router.push(`/teams/${team.id}`);
+      } catch (joinError: any) {
+        // If already a member or other error, just go to dashboard
+        console.error('Failed to join team:', joinError);
+        router.push('/dashboard');
+      }
+    } else {
+      router.push('/dashboard');
+    }
+  } catch (err: any) {
     error.value = err?.message || 'Failed to sign in';
   } finally {
     loading.value = false;

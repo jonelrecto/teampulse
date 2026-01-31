@@ -3,6 +3,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { randomInt, randomUUID } from 'crypto';
+import { TeamAdminGuard } from './guards/team-admin.guard';
+import { userInfo } from 'os';
+import { User } from '@/common/decorators/user.decorator';
 
 @Injectable()
 export class TeamsService {
@@ -55,7 +58,6 @@ export class TeamsService {
   }
 
   async findAll(userId: string) {
-    console.log('userid', userId);
     const team = await this.prisma.team.findMany({
       where: {
         TeamMembership: {
@@ -64,34 +66,6 @@ export class TeamsService {
           },
         },
       },
-      // include: {
-      //   TeamMembership: {
-      //     include: {
-      //       Users: {
-      //         select: {
-      //           id: true,
-      //           email: true,
-      //           displayName: true,
-      //           avatarUrl: true,
-      //         },
-      //       },
-      //     },
-      //   },
-      //   _count: {
-      //     select: {
-      //       CheckIn: true,
-      //     },
-      //   },
-      // },
-    });
-
-    console.log('team here', team);
-    return team;
-  }
-
-  async findOne(id: string, userId: string) {
-    const team = await this.prisma.team.findUnique({
-      where: { id },
       include: {
         TeamMembership: {
           include: {
@@ -105,21 +79,58 @@ export class TeamsService {
             },
           },
         },
+        _count: {
+          select: {
+            CheckIn: true,
+          },
+        },
       },
     });
 
+    console.log('team here', team);
+    return team;
+  }
+
+  async findOne(id: string, userId: string) {
+    const team = await this.prisma.team.findUnique({
+      where: { id },
+      include: {
+        TeamMembership: {
+          where: {
+            userId, // 👈 only YOUR membership
+          },
+          include: {
+            Users: {
+              select: {
+                id: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  
     if (!team) {
       throw new NotFoundException(`Team with ID ${id} not found`);
     }
-
-    // Check if user is a member
-    const isMember = team.TeamMembership.some((m) => m.userId === userId);
-    if (!isMember) {
+  
+    // If no membership, user is not part of the team
+    if (team.TeamMembership.length === 0) {
       throw new ForbiddenException('You are not a member of this team');
     }
-
-    return team;
+  
+    // 👇 Convert array → object
+    const myMembership = team.TeamMembership[0];
+  
+    return {
+      ...team,
+      TeamMembership: myMembership,
+    };
   }
+  
 
   async update(id: string, userId: string, updateTeamDto: UpdateTeamDto) {
     // Check if user is admin
@@ -175,5 +186,164 @@ export class TeamsService {
     return this.prisma.team.delete({
       where: { id },
     });
+  }
+
+  async regenerate(teamId: string, userId: string) {
+    // Verify user is admin
+    const membership = await this.prisma.teamMembership.findFirst({
+      where: {
+        teamId,
+        userId,
+        role: 'ADMIN',
+      },
+    });
+  
+    if (!membership) {
+      throw new ForbiddenException('You must be an admin to regenerate invite code');
+    }
+  
+    // Generate new 6-digit code
+    const inviteCode = Math.floor(100000 + Math.random() * 900000).toString();
+  
+    return this.prisma.team.update({
+      where: { id: teamId },
+      data: {
+        inviteCode,
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  async getTeamByCode(code: string) {
+    return await this.prisma.team.findFirst({
+      where: { inviteCode: code }
+    });
+
+  }
+
+  async joinTeam(code: string, userId: string) {
+    // Verify team exists
+    const team = await this.getTeamByCode(code);
+  
+    // Check if already a member
+    const existingMembership = await this.prisma.teamMembership.findUnique({
+      where: {
+        userId_teamId: {
+          userId,
+          teamId: team.id,
+        },
+      },
+    });
+  
+    if (existingMembership) {
+      throw new BadRequestException('You are already a member of this team');
+    }
+  
+    // Create membership
+    const membership = await this.prisma.teamMembership.create({
+      data: {
+        id: randomUUID(),
+        userId,
+        teamId: team.id,
+        role: 'MEMBER',
+      },
+      include: {
+        Team: {
+          select: {
+            id: true,
+            name: true,
+            logoUrl: true,
+          },
+        },
+      },
+    });
+  
+    return {
+      message: 'Successfully joined team',
+      team: membership.Team,
+      membership: {
+        id: membership.id,
+        role: membership.role,
+        joinedAt: membership.joinedAt,
+      },
+    };
+  }
+
+  async teamCheckins(id: string, user: any) {
+    return await this.prisma.checkIn.findMany({
+      where: { teamId : id },
+      include: {
+        Users: {
+          select: {
+            id: true,
+            displayName: true
+          }
+        }
+      }
+    })
+  }
+
+  async teamMembers(id: string) {
+    return await this.prisma.teamMembership.findMany({
+      where: { teamId: id},
+      include: {
+        Users: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            avatarUrl: true
+          }
+        }
+      }
+    })
+  }
+
+  async removeMember(teamId: string, targetUserId: string, adminUserId: string) {
+    // ❌ Prevent removing yourself
+    if (targetUserId === adminUserId) {
+      throw new BadRequestException('You cannot remove yourself from the team');
+    }
+  
+    // ✅ Ensure admin is actually admin (extra safety)
+    const adminMembership = await this.prisma.teamMembership.findFirst({
+      where: {
+        teamId,
+        userId: adminUserId,
+        role: 'ADMIN',
+      },
+    });
+  
+    if (!adminMembership) {
+      throw new ForbiddenException('Only admins can remove members');
+    }
+  
+    // ✅ Ensure target user is a member of this team
+    const member = await this.prisma.teamMembership.findUnique({
+      where: {
+        userId_teamId: {
+          userId: targetUserId,
+          teamId,
+        },
+      },
+    });
+  
+    if (!member) {
+      throw new NotFoundException('User is not a member of this team');
+    }
+  
+    // ✅ Remove membership
+    await this.prisma.teamMembership.delete({
+      where: {
+        userId_teamId: {
+          userId: targetUserId,
+          teamId,
+        },
+      },
+    });
+  
+    return {
+      message: 'Member removed successfully',
+    };
   }
 }

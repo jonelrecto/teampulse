@@ -20,11 +20,18 @@ interface Member {
   };
 }
 
+interface Role {
+  teamId: string,
+  userId: string,
+  role: string
+}
+
 export const useTeamStore = defineStore('team', {
   state: () => ({
     teams: [] as Team[],
     currentTeam: null as Team | null,
     members: [] as Member[],
+    role: [] as Role[],
   }),
 
   actions: {
@@ -39,5 +46,9 @@ export const useTeamStore = defineStore('team', {
     setMembers(members: Member[]) {
       this.members = members;
     },
+
+    setRole(role: Role[]) {
+      this.role = role;
+    }
   },
 });

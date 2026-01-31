@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCheckInDto } from './dto/create-check-in.dto';
 import { UpdateCheckInDto } from './dto/update-check-in.dto';
@@ -34,7 +34,11 @@ export class CheckInsService {
     });
 
     if (existingCheckIn) {
-      throw new ForbiddenException('Check-in already submitted for today');
+      return {
+        statusCode: 409,
+        message: 'Check-in already summitted for today.',
+        data: existingCheckIn
+      }
     }
 
     return this.prisma.checkIn.create({
@@ -66,6 +70,39 @@ export class CheckInsService {
         },
       },
     });
+  }
+
+  async attach(checkInId: string, userId: string, publicUrl: string, fileName: string) {
+    // Verify the check-in exists
+    const checkIn = await this.prisma.checkIn.findUnique({
+      where: { id: checkInId },
+      include: {
+        CheckInAttachment: true,
+      }
+    });
+
+    if (!checkIn) {
+      throw new NotFoundException('Check-in not found.');
+    }
+
+    // Verify ownership
+    if (checkIn.userId !== userId) {
+      throw new ForbiddenException('You can only add attachments to your own check-ins');
+    }
+
+    if (checkIn.CheckInAttachment.length >= 3) {
+      throw new BadRequestException('Maximum 3 attachment allowed per check-in');
+    }
+
+    return await this.prisma.checkInAttachment.create({
+      data: {
+        id: randomUUID(),
+        checkInId: checkInId,
+        url: publicUrl,
+        filename: fileName,
+        storagePath: fileName
+      }
+    })
   }
 
   async findAll(teamId: string, userId: string) {

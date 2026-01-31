@@ -34,8 +34,9 @@ export class UsersService {
   }
 
   async findBySupabaseId(supabaseId: string) {
+
     return this.prisma.users.findUnique({
-      where: { supabaseId },
+      where: { supabaseId }
     });
   }
 

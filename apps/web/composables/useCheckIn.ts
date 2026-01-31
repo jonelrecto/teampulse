@@ -1,6 +1,7 @@
 import { useApi } from './useApi';
 import { useCheckInStore } from '~/stores/checkIn';
 import type { CheckInDraft } from '@team-pulse/shared';
+import { useSupabaseClient } from '#imports';
 
 export const useCheckIn = () => {
   const api = useApi();
@@ -44,6 +45,7 @@ export const useCheckIn = () => {
   const createCheckIn = async (
     teamId: string,
     data: {
+      teamId: string
       yesterday: string;
       today: string;
       blockers?: string;
@@ -51,7 +53,7 @@ export const useCheckIn = () => {
       energy: number;
     },
   ) => {
-    const checkIn = await api.post<any>(`/teams/${teamId}/check-ins`, data);
+    const checkIn = await api.post<any>(`/check-ins/${teamId}`, data);
     clearDraft(teamId);
     return checkIn;
   };
@@ -77,7 +79,7 @@ export const useCheckIn = () => {
     if (filters?.limit) params.append('limit', filters.limit.toString());
 
     const result = await api.get<any>(
-      `/teams/${teamId}/check-ins${params.toString() ? `?${params.toString()}` : ''}`,
+      `/check-ins/team/${teamId}${params.toString() ? `?${params.toString()}` : ''}`,
     );
     return result;
   };
@@ -98,7 +100,7 @@ export const useCheckIn = () => {
       energy?: number;
     },
   ) => {
-    const checkIn = await api.patch<any>(`/teams/${teamId}/check-ins/${checkInId}`, data);
+    const checkIn = await api.patch<any>(`/check-ins/${checkInId}`, data);
     return checkIn;
   };
 
@@ -117,7 +119,7 @@ export const useCheckIn = () => {
     } = await supabase.auth.getSession();
 
     const response = await fetch(
-      `${config.public.apiUrl}/teams/${teamId}/check-ins/${checkInId}/attachments`,
+      `${config.public.apiUrl}/check-ins/${teamId}/${checkInId}/attachments`,
       {
         method: 'POST',
         headers: {

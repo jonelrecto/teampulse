@@ -15,23 +15,37 @@
         >
           <div class="flex items-center gap-3">
             <img
-              v-if="member.user?.avatarUrl"
-              :src="member.user.avatarUrl"
-              :alt="member.user.displayName"
+              v-if="member.Users?.avatarUrl"
+              :src="member.Users.avatarUrl"
+              :alt="member.Users.displayName"
               class="w-10 h-10 rounded-full"
             />
             <div>
-              <p class="font-semibold">{{ member.user?.displayName }}</p>
-              <p class="text-sm text-gray-600">{{ member.user?.email }}</p>
+              <p class="font-semibold">{{ member.Users?.displayName }}</p>
+              <p class="text-sm text-gray-600">{{ member.Users?.email }}</p>
             </div>
           </div>
+
           <div class="flex items-center gap-4">
             <span
               class="px-2 py-1 text-xs rounded"
-              :class="member.role === 'ADMIN' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'"
+              :class="
+                member.role === 'ADMIN'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100 text-gray-800'
+              "
             >
               {{ member.role }}
             </span>
+
+            <!-- ✅ Remove button (not for yourself) -->
+            <button
+              v-if="canRemove(member)"
+              @click="remove(member)"
+              class="text-sm text-red-600 hover:text-red-800 font-medium"
+            >
+              Remove
+            </button>
           </div>
         </div>
       </div>
@@ -47,8 +61,25 @@ definePageMeta({
 const route = useRoute();
 const teamId = route.params.teamId as string;
 
-const { members, fetchMembers } = useTeam();
+const { members, fetchMembers, removeMember } = useTeam();
+const { user } = useAuth(); // current logged-in user
 const loading = ref(true);
+
+const canRemove = (member: any) => {
+  // ❌ cannot remove yourself
+  if (member.userId === user.value.id) return false;
+
+  // ✅ optional: only admins can remove
+  const me = members.value.find(m => m.userId === user.value.id);
+  return me?.role === 'ADMIN';
+};
+
+const remove = async (member: any) => {
+  if (!confirm(`Remove ${member.Users.displayName} from the team?`)) return;
+
+  await removeMember(teamId, member.userId);
+  await fetchMembers(teamId);
+};
 
 onMounted(async () => {
   await fetchMembers(teamId);

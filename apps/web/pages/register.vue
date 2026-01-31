@@ -5,6 +5,9 @@
         <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Create your account
         </h2>
+        <p v-if="inviteTeam" class="mt-2 text-center text-sm text-gray-600">
+          Join <strong class="text-indigo-600">{{ inviteTeam.name }}</strong> after signing up
+        </p>
       </div>
       <form class="mt-8 space-y-6" @submit.prevent="handleRegister">
         <div class="rounded-md shadow-sm space-y-4">
@@ -44,7 +47,7 @@
               required
               minlength="6"
               class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Password"
+              placeholder="Password (min 6 characters)"
             />
           </div>
         </div>
@@ -63,7 +66,10 @@
         </div>
 
         <div class="text-center">
-          <NuxtLink to="/login" class="text-sm text-indigo-600 hover:text-indigo-500">
+          <NuxtLink 
+            :to="inviteCode ? `/login?invite=${inviteCode}` : '/login'" 
+            class="text-sm text-indigo-600 hover:text-indigo-500"
+          >
             Already have an account? Sign in
           </NuxtLink>
         </div>
@@ -79,14 +85,32 @@ definePageMeta({
 });
 
 const { register } = useAuth();
+const { joinTeam } = useTeam();
 const router = useRouter();
-const config = useRuntimeConfig();
+const route = useRoute();
+const api = useApi();
 
 const displayName = ref('');
 const email = ref('');
 const password = ref('');
 const loading = ref(false);
 const error = ref('');
+const inviteCode = ref<string | null>(null);
+const inviteTeam = ref<any>(null);
+
+// Check for invite code in URL
+onMounted(async () => {
+  const code = route.query.invite as string;
+  if (code) {
+    inviteCode.value = code;
+    try {
+      // Fetch team info to display
+      inviteTeam.value = await api.get(`/teams/join/${code}`);
+    } catch (err) {
+      console.error('Failed to fetch team info:', err);
+    }
+  }
+});
 
 const handleRegister = async () => {
   loading.value = true;
@@ -94,8 +118,22 @@ const handleRegister = async () => {
 
   try {
     await register(email.value, password.value, displayName.value);
-    router.push('/dashboard');
-  } catch (err) {
+    
+    // If there's an invite code, join the team
+    if (inviteCode.value) {
+      try {
+        await joinTeam(inviteCode.value);
+        const team = await api.get(`/teams/join/${inviteCode.value}`);
+        router.push(`/teams/${team.id}`);
+      } catch (joinError: any) {
+        // If already a member or other error, just go to dashboard
+        console.error('Failed to join team:', joinError);
+        router.push('/dashboard');
+      }
+    } else {
+      router.push('/dashboard');
+    }
+  } catch (err: any) {
     error.value = err.message || 'Failed to create account';
   } finally {
     loading.value = false;

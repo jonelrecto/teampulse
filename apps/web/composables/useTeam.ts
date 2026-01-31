@@ -14,6 +14,7 @@ export const useTeam = () => {
   const fetchTeam = async (teamId: string) => {
     const team = await api.get<any>(`/teams/${teamId}`);
     teamStore.setCurrentTeam(team);
+    // teamStore.setRole(role);
     return team;
   };
 

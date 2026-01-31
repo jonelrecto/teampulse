@@ -24,9 +24,9 @@ export class CreateCheckInDto {
   @IsEnum(Mood)
   mood: Mood;
 
-  @ApiProperty({ minimum: 1, maximum: 10 })
+  @ApiProperty({ minimum: 1, maximum: 5 })
   @IsInt()
   @Min(1)
-  @Max(10)
+  @Max(5)
   energy: number;
 }

@@ -45,10 +45,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile retrieved' })
   async getMe(@CurrentUser() user: any) {
-    console.log('me here');
-
     const userData = await this.usersService.findBySupabaseId(user.id);
-    console.log('userData', userData);
     return { ...user, ...userData };
   }
 
